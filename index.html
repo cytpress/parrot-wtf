@@ -1,195 +1,174 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>3D 立方體視覺化器 (視圖居中)</title>
-    <style>
-      /* ... (body, controls, scene-viewport, camera-rig CSS unchanged) ... */
-      body,
-      html {
-        height: 100%;
-        margin: 0;
-        overflow: hidden;
-      } /* Ensure body takes full height */
-      body {
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D 座標驗證</title>
+<style>
+    /* ... (大部分 CSS 保持不變) ... */
+    body, html { height: 100%; margin: 0; overflow: hidden; }
+    body {
         font-family: sans-serif;
         background-color: #222;
         color: #eee;
         display: flex;
         flex-direction: column;
         align-items: center;
-        justify-content: center; /* This centers scene-viewport in the body */
-      }
+        justify-content: center;
+    }
 
-      .controls {
-        margin-bottom: 20px;
+    .controls {
+        margin-bottom: 10px; /* Reduced margin */
         padding: 10px;
         background-color: #333;
         border-radius: 5px;
         text-align: center;
-        flex-shrink: 0; /* Prevent controls from shrinking */
-      }
+        flex-shrink: 0;
+        position: relative; /* For z-index if needed */
+        z-index: 10;
+    }
+    .controls p { margin: 5px 0; font-size: 0.9em; }
+    .controls label { margin-right: 5px; }
+    .controls input[type="range"] { width: 120px; vertical-align: middle; }
+    .controls button {
+        padding: 5px 10px; background-color: #555; color: white;
+        border: none; border-radius: 3px; cursor: pointer; margin-left: 10px;
+    }
+    .controls button:hover { background-color: #666; }
 
-      #scene-viewport {
-        width: 80vw;
-        height: 70vh;
-        max-width: 800px;
-        max-height: 600px;
+    #scene-viewport {
+        width: 80vw; height: 70vh;
+        max-width: 800px; max-height: 600px;
         border: 1px solid #555;
         perspective: 1000px;
         background-color: #1a1a1a;
-        overflow: hidden; /* Important */
-        position: relative; /* Needed for absolute children like camera-rig */
+        overflow: hidden;
+        position: relative;
         cursor: grab;
-      }
+    }
 
-      #camera-rig {
-        width: 100%;
-        height: 100%;
+    #camera-rig {
+        width: 100%; height: 100%;
         transform-style: preserve-3d;
         position: absolute;
-        /* top: 0; left: 0; by default for absolute positioning */
-        /* This div's (0,0,0) is effectively the viewport center for its children */
-      }
+    }
 
-      #scene {
-        /* Renamed to sceneElement in JS */
-        /* KEY CHANGE: Let its size be determined by content or minimal.
-           Its (0,0,0) is the origin for blocks and axes.
-           Its position relative to camera-rig is (0,0,0) before camera-rig transforms. */
-        width: 1px; /* Or 0px, or remove. Doesn't really matter for positioning children */
-        height: 1px;
+    #scene {
+        width: 1px; height: 1px;
         transform-style: preserve-3d;
-        position: absolute; /* Positioned at camera-rig's (0,0,0) */
-        top: 50%; /* Center #scene within #camera-rig */
+        position: absolute;
+        transform-origin: 0 0 0;
+        top: 50%;
         left: 50%;
-        /* transform: translate(-50%, -50%); If we want its own geometry centered */
-        /* The above translate(-50%,-50%) might be needed if its own small box (1px)
-           influences the perceived center. But usually, with absolute children, it's fine.
-           Let's test without it first. */
-        transform-origin: 0 0 0; /* Rotate around its own (0,0,0) */
-      }
+    }
 
-      .block {
-        /* ... unchanged ... */
+    .block {
         position: absolute;
         transform-style: preserve-3d;
         font-size: 10px;
         user-select: none;
-      }
+        /* Add transition for smoother highlight */
+        /* transition: transform 0.1s ease-out; */ /* Can cause issues with rapid mouse movements */
+    }
+    .block:hover {
+        /* Optional: highlight on hover, e.g., slightly scale or change border
+           Be careful as this can affect performance or cause visual jitter */
+        /* transform: scale3d(1.2, 1.2, 1.2); */
+    }
 
-      .block .face {
-        /* ... unchanged ... */
+
+    .block .face {
         position: absolute;
-        width: 100%;
-        height: 100%;
+        width: 100%; height: 100%;
         box-sizing: border-box;
         border: 1px solid rgba(0, 0, 0, 0.5);
         opacity: 0.85;
         backface-visibility: hidden;
-      }
+    }
+    /* ... (face colors and transforms unchanged) ... */
+    .block-type-z .face { background-color: #ff6b6b; }
+    .block-type-O .face { background-color: #feca57; }
+    .block-type-y .face { background-color: #48dbfb; } /* This is for data type 'y' */
+    .block-type-xy .face { background-color: #1dd1a1; }
+    .block-type-x .face { background-color: #ff9ff3; }
+    .block-type-yz .face { background-color: #54a0ff; }
+    .block-type-xz .face { background-color: #c8d6e5; }
+    .block-type-empty .face { background-color: #8395a7; }
+    .block-type-unknown .face { background-color: #576574; }
 
-      .block-type-z .face {
-        background-color: #ff6b6b;
-      }
-      .block-type-O .face {
-        background-color: #feca57;
-      }
-      .block-type-y .face {
-        background-color: #48dbfb;
-      }
-      .block-type-xy .face {
-        background-color: #1dd1a1;
-      }
-      .block-type-x .face {
-        background-color: #ff9ff3;
-      }
-      .block-type-yz .face {
-        background-color: #54a0ff;
-      }
-      .block-type-xz .face {
-        background-color: #c8d6e5;
-      }
-      .block-type-empty .face {
-        background-color: #8395a7;
-      }
-      .block-type-unknown .face {
-        background-color: #576574;
-      }
+    .block .front  { transform: rotateY(  0deg) translateZ(var(--half-size)); }
+    .block .back   { transform: rotateY(180deg) translateZ(var(--half-size)); }
+    .block .right  { transform: rotateY( 90deg) translateZ(var(--half-size)); }
+    .block .left   { transform: rotateY(-90deg) translateZ(var(--half-size)); }
+    .block .top    { transform: rotateX( 90deg) translateZ(var(--half-size)); }
+    .block .bottom { transform: rotateX(-90deg) translateZ(var(--half-size)); }
 
-      .block .front {
-        transform: rotateY(0deg) translateZ(var(--half-size));
-      }
-      .block .back {
-        transform: rotateY(180deg) translateZ(var(--half-size));
-      }
-      .block .right {
-        transform: rotateY(90deg) translateZ(var(--half-size));
-      }
-      .block .left {
-        transform: rotateY(-90deg) translateZ(var(--half-size));
-      }
-      .block .top {
-        transform: rotateX(90deg) translateZ(var(--half-size));
-      }
-      .block .bottom {
-        transform: rotateX(-90deg) translateZ(var(--half-size));
-      }
 
-      .axis {
-        /* ... unchanged ... */
+    .axis { /* ... unchanged ... */
         position: absolute;
         transform-origin: 0 50%;
         height: 3px;
-      }
-      .axis-x-positive {
-        background-color: red;
-      }
-      .axis-y-positive {
-        background-color: green;
-      }
-      .axis-z-positive {
-        background-color: blue;
-      }
+    }
+    .axis-x-positive { background-color: red; }
+    .axis-y-positive { background-color: green; }
+    .axis-z-positive { background-color: blue; }
 
-      .axis-label {
-        /* ... unchanged ... */
+    .axis-label { /* ... unchanged ... */
         position: absolute;
         color: white;
         font-size: 16px;
         font-weight: bold;
         user-select: none;
-      }
-    </style>
-  </head>
-  <body>
-    <!-- HTML unchanged -->
-    <h1>3D 立方體視覺化器</h1>
-    <div class="controls">
-      <p>左鍵拖拽：旋轉 | 空白鍵 + 左鍵拖拽：平移 | 滑鼠滾輪：縮放</p>
-      <div>
-        <label for="blockSize">方塊大小:</label>
-        <input type="range" id="blockSize" min="5" max="50" value="20" />
-        <span id="blockSizeValue">20px</span>
-      </div>
-      <div>
-        <label for="spacing">間距因子:</label>
-        <input type="range" id="spacing" min="10" max="80" value="30" />
-        <span id="spacingValue">30</span>
-      </div>
-      <button id="resetView">重置視圖</button>
-    </div>
+    }
 
-    <div id="scene-viewport">
-      <div id="camera-rig">
-        <div id="scene">
-          <!-- Dynamic content here -->
-        </div>
-      </div>
+    #tooltip {
+        position: fixed; /* Or absolute relative to a container */
+        bottom: 10px;
+        left: 10px;
+        background-color: rgba(0,0,0,0.7);
+        color: white;
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-size: 14px;
+        pointer-events: none; /* So it doesn't interfere with mouse events on blocks */
+        z-index: 100;
+        opacity: 0;
+        transition: opacity 0.2s ease-in-out;
+    }
+    #tooltip.visible {
+        opacity: 1;
+    }
+
+</style>
+</head>
+<body>
+<h1>3D 座標視覺化器</h1>
+<div class="controls">
+    <p>左鍵拖拽：旋轉 | 空白鍵 + 左鍵拖拽：平移 | 滑鼠滾輪：縮放</p>
+    <div>
+        <label for="blockSize">方塊大小:</label>
+        <input type="range" id="blockSize" min="5" max="50" value="20">
+        <span id="blockSizeValue">20px</span>
     </div>
-    <script>
-      const dataString = `
+     <div>
+        <label for="spacing">間距因子:</label>
+        <input type="range" id="spacing" min="10" max="80" value="30">
+        <span id="spacingValue">30</span>
+    </div>
+    <button id="resetView">重置視圖</button>
+</div>
+
+<div id="scene-viewport">
+    <div id="camera-rig">
+        <div id="scene">
+            <!-- Dynamic content here -->
+        </div>
+    </div>
+</div>
+<div id="tooltip">Hover over a block to see its info.</div>
+
+<script>
+const dataString = `
 block ID	x	y	z	/
 1	0	0	5	
 2	0	2	3	z
@@ -291,378 +270,367 @@ block ID	x	y	z	/
 98	15	3	12	
 `;
 
-      const sceneElement = document.getElementById("scene");
-      const cameraRig = document.getElementById("camera-rig");
-      const sceneViewport = document.getElementById("scene-viewport");
-      // ... (other consts unchanged) ...
-      const blockSizeSlider = document.getElementById("blockSize");
-      const blockSizeValueDisplay = document.getElementById("blockSizeValue");
-      const spacingSlider = document.getElementById("spacing");
-      const spacingValueDisplay = document.getElementById("spacingValue");
-      const resetButton = document.getElementById("resetView");
+const sceneElement = document.getElementById('scene');
+const cameraRig = document.getElementById('camera-rig');
+const sceneViewport = document.getElementById('scene-viewport');
+const blockSizeSlider = document.getElementById('blockSize');
+const blockSizeValueDisplay = document.getElementById('blockSizeValue');
+const spacingSlider = document.getElementById('spacing');
+const spacingValueDisplay = document.getElementById('spacingValue');
+const resetButton = document.getElementById('resetView');
+const tooltipElement = document.getElementById('tooltip'); // Get the tooltip element
 
-      let blocksData = [];
-      let dataBounds = null;
-      let currentBlockSize = parseInt(blockSizeSlider.value);
-      let currentSpacingFactor = parseInt(spacingSlider.value);
+let blocksData = [];
+let dataBounds = null;
+let currentBlockSize = parseInt(blockSizeSlider.value);
+let currentSpacingFactor = parseInt(spacingSlider.value);
 
-      const INITIAL_ROTATION_X = 0; // Keep at 0 for centering tests
-      const INITIAL_ROTATION_Y = 0; // Keep at 0 for centering tests
-      // const INITIAL_ROTATION_X = -30;
-      // const INITIAL_ROTATION_Y = 30;
+// Restore initial rotations if centering is good
+const INITIAL_ROTATION_X = -30;
+const INITIAL_ROTATION_Y = 30;
+// const INITIAL_ROTATION_X = 0; // Use for testing centering
+// const INITIAL_ROTATION_Y = 0;
 
-      const INITIAL_CAMERA_X = 0;
-      const INITIAL_CAMERA_Y = 0;
+const INITIAL_CAMERA_X = 0;
+const INITIAL_CAMERA_Y = 0;
 
-      let rotationX = INITIAL_ROTATION_X;
-      let rotationY = INITIAL_ROTATION_Y;
-      let cameraTranslateX = INITIAL_CAMERA_X;
-      let cameraTranslateY = INITIAL_CAMERA_Y;
-      let cameraTranslateZ = 0;
+let rotationX = INITIAL_ROTATION_X;
+let rotationY = INITIAL_ROTATION_Y;
+let cameraTranslateX = INITIAL_CAMERA_X;
+let cameraTranslateY = INITIAL_CAMERA_Y;
+let cameraTranslateZ = 0;
 
-      function parseData(dataStr) {
-        /* ... unchanged ... */
-        const lines = dataStr.trim().split("\n");
-        const headers = lines[0].split("\t").map((h) => h.trim());
-        const data = [];
-        let minX = Infinity,
-          minY = Infinity,
-          minZ = Infinity;
-        let maxX = -Infinity,
-          maxY = -Infinity,
-          maxZ = -Infinity;
-        for (let i = 1; i < lines.length; i++) {
-          const values = lines[i].split("\t");
-          if (values.length < 4) continue;
-          const block = {
-            id: parseInt(values[0].trim()),
-            x: parseInt(values[1].trim()),
-            y: parseInt(values[2].trim()),
-            z: parseInt(values[3].trim()),
-            type: (values[4] || "").trim(),
-          };
-          if (isNaN(block.x) || isNaN(block.y) || isNaN(block.z)) continue;
-          data.push(block);
-          minX = Math.min(minX, block.x);
-          minY = Math.min(minY, block.y);
-          minZ = Math.min(minZ, block.z);
-          maxX = Math.max(maxX, block.x);
-          maxY = Math.max(maxY, block.y);
-          maxZ = Math.max(maxZ, block.z);
+
+function parseData(dataStr) {
+    const lines = dataStr.trim().split('\n');
+    const headers = lines[0].split('\t').map(h => h.trim());
+    const data = [];
+    let minX = Infinity, minY = Infinity, minZ = Infinity;
+    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+
+    for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split('\t');
+        if (values.length < 4) continue; // Ensure at least ID, x, y, z are present
+
+        // Parse original coordinates
+        let originalX = parseInt(values[1].trim());
+        let originalY = parseInt(values[2].trim());
+        let originalZ = parseInt(values[3].trim());
+        const type = (values[4] || "").trim(); // Get type, default to empty string if not present
+
+        if (isNaN(originalX) || isNaN(originalY) || isNaN(originalZ)) continue; // Skip if coords are not numbers
+
+        // Initialize final coordinates with original values
+        let finalX = originalX;
+        let finalY = originalY;
+        let finalZ = originalZ;
+
+        // Apply symmetry transformations based on type
+        // The type string indicates which coordinates to negate
+        if (type.includes('x')) {
+            finalX = -originalX;
         }
-        dataBounds = { minX, minY, minZ, maxX, maxY, maxZ };
-        return data;
-      }
+        if (type.includes('y')) {
+            finalY = -originalY;
+        }
+        if (type.includes('z')) {
+            finalZ = -originalZ;
+        }
+        // Special case for 'O' (origin symmetry), which implies xyz
+        // This also correctly handles if type was "O" and also, for some reason, "Ox", "Oy", "Oz", etc.
+        // Though typically 'O' would stand alone.
+        // If 'O' is strictly 'xyz' and nothing else, a direct check is fine:
+        if (type === 'O') {
+            finalX = -originalX;
+            finalY = -originalY;
+            finalZ = -originalZ;
+        }
+        // Note: If type is, for example, "xy", the includes('x') and includes('y') will correctly negate both.
 
-      function createBlocks(blocks) {
-        /* ... unchanged ... */
-        sceneElement.innerHTML = "";
-        if (!dataBounds || blocks.length === 0) return;
-        const { minX, minY, minZ, maxX, maxY, maxZ } = dataBounds;
-        const centerX = (minX + maxX) / 2;
-        const centerY = (minY + maxY) / 2;
-        const centerZ = (minZ + maxZ) / 2;
+        const block = {
+            id: parseInt(values[0].trim()),
+            x: finalX, // Use the transformed x-coordinate
+            y: finalY, // Use the transformed y-coordinate
+            z: finalZ, // Use the transformed z-coordinate
+            type: type  // Keep the original type for styling/coloring
+        };
 
-        blocks.forEach((blockData) => {
-          const blockElement = document.createElement("div");
-          blockElement.classList.add("block");
-          blockElement.dataset.id = blockData.id;
-          let typeClass = "block-type-unknown";
-          if (blockData.type === "") typeClass = "block-type-empty";
-          else if (
-            ["z", "O", "y", "xy", "x", "yz", "xz"].includes(blockData.type)
-          ) {
+        data.push(block);
+
+        // Update bounds using the FINAL (transformed) coordinates
+        minX = Math.min(minX, block.x);
+        minY = Math.min(minY, block.y);
+        minZ = Math.min(minZ, block.z);
+        maxX = Math.max(maxX, block.x);
+        maxY = Math.max(maxY, block.y);
+        maxZ = Math.max(maxZ, block.z);
+    }
+    dataBounds = { minX, minY, minZ, maxX, maxY, maxZ };
+    return data;
+}
+
+function createBlocks(blocks) {
+    sceneElement.innerHTML = ''; // Clear previous blocks and axes if axes are inside sceneElement
+    if (!dataBounds || blocks.length === 0) return;
+    const { minX, minY, minZ, maxX, maxY, maxZ } = dataBounds;
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+    const centerZ = (minZ + maxZ) / 2;
+
+    blocks.forEach(blockData => {
+        const blockElement = document.createElement('div');
+        blockElement.classList.add('block');
+        
+        // Store ALL relevant original data in dataset for tooltip
+        blockElement.dataset.blockId = blockData.id;
+        blockElement.dataset.blockX = blockData.x;
+        blockElement.dataset.blockY = blockData.y;
+        blockElement.dataset.blockZ = blockData.z;
+        blockElement.dataset.blockType = blockData.type || 'N/A';
+
+        // Store calculated center (used by applyBlockTransform)
+        blockElement.dataset.centerX = centerX;
+        blockElement.dataset.centerY = centerY;
+        blockElement.dataset.centerZ = centerZ;
+        
+        let typeClass = 'block-type-unknown';
+        if (blockData.type === '') typeClass = 'block-type-empty';
+        else if (['z', 'O', 'y', 'xy', 'x', 'yz', 'xz'].includes(blockData.type)) {
             typeClass = `block-type-${blockData.type}`;
-          }
-          blockElement.classList.add(typeClass);
-          const faces = ["front", "back", "left", "right", "top", "bottom"];
-          faces.forEach((faceName) => {
-            const faceDiv = document.createElement("div");
-            faceDiv.classList.add("face", faceName);
-            blockElement.appendChild(faceDiv);
-          });
-          blockElement.dataset.origX = blockData.x;
-          blockElement.dataset.origY = blockData.y;
-          blockElement.dataset.origZ = blockData.z;
-          blockElement.dataset.centerX = centerX;
-          blockElement.dataset.centerY = centerY;
-          blockElement.dataset.centerZ = centerZ;
-          applyBlockTransform(
-            blockElement,
-            currentBlockSize,
-            currentSpacingFactor
-          );
-          sceneElement.appendChild(blockElement);
-        });
-      }
+        }
+        blockElement.classList.add(typeClass);
 
-      function applyBlockTransform(blockElement, blockSize, spacingFactor) {
-        /* ... unchanged ... */
-        const x = parseFloat(blockElement.dataset.origX),
-          y = parseFloat(blockElement.dataset.origY),
-          z = parseFloat(blockElement.dataset.origZ);
-        const centerX = parseFloat(blockElement.dataset.centerX),
+        const faces = ['front', 'back', 'left', 'right', 'top', 'bottom'];
+        faces.forEach(faceName => {
+            const faceDiv = document.createElement('div');
+            faceDiv.classList.add('face', faceName);
+            blockElement.appendChild(faceDiv);
+        });
+
+        // Add event listeners for tooltip
+        blockElement.addEventListener('mouseover', handleBlockMouseOver);
+        blockElement.addEventListener('mouseout', handleBlockMouseOut);
+        
+        applyBlockTransform(blockElement, currentBlockSize, currentSpacingFactor);
+        sceneElement.appendChild(blockElement);
+    });
+}
+
+function handleBlockMouseOver(event) {
+    const blockElement = event.currentTarget;
+    tooltipElement.innerHTML = `ID: ${blockElement.dataset.blockId}<br>
+                                X: ${blockElement.dataset.blockX}<br>
+                                Y: ${blockElement.dataset.blockY} (Depth)<br>
+                                Z: ${blockElement.dataset.blockZ} (Height)<br>
+                                Type: ${blockElement.dataset.blockType}`;
+    tooltipElement.classList.add('visible');
+}
+
+function handleBlockMouseOut() {
+    tooltipElement.classList.remove('visible');
+}
+
+
+function applyBlockTransform(blockElement, blockSize, spacingFactor) { /* ... unchanged ... */
+    const x = parseFloat(blockElement.dataset.blockX), // Use the stored raw data
+          y = parseFloat(blockElement.dataset.blockY),
+          z = parseFloat(blockElement.dataset.blockZ);
+    const centerX = parseFloat(blockElement.dataset.centerX),
           centerY = parseFloat(blockElement.dataset.centerY),
           centerZ = parseFloat(blockElement.dataset.centerZ);
-        const adjustedX = (x - centerX) * spacingFactor,
-          adjustedY = (y - centerY) * spacingFactor,
-          adjustedZ = (z - centerZ) * spacingFactor;
+    
+    const adjustedX = (x - centerX) * spacingFactor;
+    const adjustedY = (y - centerY) * spacingFactor; 
+    const adjustedZ = (z - centerZ) * spacingFactor; 
 
-        blockElement.style.setProperty("--half-size", `${blockSize / 2}px`);
-        blockElement.style.width = `${blockSize}px`;
-        blockElement.style.height = `${blockSize}px`;
+    blockElement.style.setProperty('--half-size', `${blockSize / 2}px`);
+    blockElement.style.width = `${blockSize}px`;
+    blockElement.style.height = `${blockSize}px`;
+    
+    const cssX = adjustedX;
+    const cssY = -adjustedZ; 
+    const cssZ = adjustedY;  // Positive Data Y is positive Visual Z (towards viewer)
+    blockElement.style.transform = `translate3d(${cssX}px, ${cssY}px, ${cssZ}px)`;
+}
 
-        const cssX = adjustedX;
-        const cssY = -adjustedZ;
-        const cssZ = adjustedY;
-        blockElement.style.transform = `translate3d(${cssX}px, ${cssY}px, ${cssZ}px)`;
-      }
+function updateAllBlockTransformsAndAxes() { /* ... unchanged ... */
+    const blockElements = sceneElement.querySelectorAll('.block');
+    blockElements.forEach(blockEl => {
+        applyBlockTransform(blockEl, currentBlockSize, currentSpacingFactor);
+    });
+    createOrUpdateAxes();
+}
 
-      function updateAllBlockTransformsAndAxes() {
-        /* ... unchanged ... */
-        const blockElements = sceneElement.querySelectorAll(".block");
-        blockElements.forEach((blockEl) => {
-          applyBlockTransform(blockEl, currentBlockSize, currentSpacingFactor);
-        });
-        createOrUpdateAxes();
-      }
+function calculateOptimalZoomZ() { /* ... unchanged ... */
+    if (!dataBounds) return 0;
+    const { minX, minY, minZ, maxX, maxY, maxZ } = dataBounds;
+    const spanXUnits = maxX - minX + 1;
+    const spanYUnits = maxY - minY + 1;
+    const spanZUnits = maxZ - minZ + 1;
+    const scaledSpanX = spanXUnits * currentSpacingFactor;
+    const scaledSpanDepth = spanYUnits * currentSpacingFactor;
+    const scaledSpanHeight = spanZUnits * currentSpacingFactor;
+    const modelExtentX = scaledSpanX + currentBlockSize;
+    const modelExtentDepth = scaledSpanDepth + currentBlockSize;
+    const modelExtentHeight = scaledSpanHeight + currentBlockSize;
+    const modelMaxSpan = Math.max(modelExtentX, modelExtentDepth, modelExtentHeight);
+    const viewportMinDim = Math.min(sceneViewport.clientWidth, sceneViewport.clientHeight);
+    const perspectiveValue = parseFloat(getComputedStyle(sceneViewport).perspective);
+    if (modelMaxSpan === 0 || viewportMinDim === 0 || !perspectiveValue) return -300;
+    const fillFactor = 0.75;
+    let autoZoomZ = perspectiveValue * (1 - modelMaxSpan / (viewportMinDim * fillFactor));
+    autoZoomZ = Math.min(autoZoomZ, -modelMaxSpan * 0.8); 
+    return autoZoomZ;
+}
 
-      function calculateOptimalZoomZ() {
-        /* ... unchanged ... */
-        if (!dataBounds) return 0;
-        const { minX, minY, minZ, maxX, maxY, maxZ } = dataBounds;
-        const spanXUnits = maxX - minX + 1;
-        const spanYUnits = maxY - minY + 1;
-        const spanZUnits = maxZ - minZ + 1;
-        const scaledSpanX = spanXUnits * currentSpacingFactor;
-        const scaledSpanDepth = spanYUnits * currentSpacingFactor;
-        const scaledSpanHeight = spanZUnits * currentSpacingFactor;
-        const modelExtentX = scaledSpanX + currentBlockSize;
-        const modelExtentDepth = scaledSpanDepth + currentBlockSize;
-        const modelExtentHeight = scaledSpanHeight + currentBlockSize;
-        const modelMaxSpan = Math.max(
-          modelExtentX,
-          modelExtentDepth,
-          modelExtentHeight
-        );
-        const viewportMinDim = Math.min(
-          sceneViewport.clientWidth,
-          sceneViewport.clientHeight
-        );
-        const perspectiveValue = parseFloat(
-          getComputedStyle(sceneViewport).perspective
-        );
-        if (modelMaxSpan === 0 || viewportMinDim === 0 || !perspectiveValue)
-          return -300;
-        const fillFactor = 0.75;
-        let autoZoomZ =
-          perspectiveValue * (1 - modelMaxSpan / (viewportMinDim * fillFactor));
-        autoZoomZ = Math.min(autoZoomZ, -modelMaxSpan * 0.8);
-        return autoZoomZ;
-      }
+function createOrUpdateAxes() { // Ensure Y (Depth) label is correct
+    let axesContainer = sceneElement.querySelector('#axes-container');
+    if (!axesContainer) {
+        axesContainer = document.createElement('div');
+        axesContainer.id = 'axes-container';
+        axesContainer.style.transformStyle = 'preserve-3d';
+        sceneElement.appendChild(axesContainer);
+    }
+    axesContainer.innerHTML = '';
 
-      function createOrUpdateAxes() {
-        let axesContainer = sceneElement.querySelector("#axes-container");
-        if (!axesContainer) {
-          axesContainer = document.createElement("div");
-          axesContainer.id = "axes-container";
-          axesContainer.style.transformStyle = "preserve-3d";
-          sceneElement.appendChild(axesContainer);
-        }
-        axesContainer.innerHTML = "";
+    if (!dataBounds) return;
+    const { minX, minY, minZ, maxX, maxY, maxZ } = dataBounds;
+    const modelSpanX = (maxX - minX + 1) * currentSpacingFactor;
+    const modelSpanDataY = (maxY - minY + 1) * currentSpacingFactor;
+    const modelSpanDataZ = (maxZ - minZ + 1) * currentSpacingFactor;
+    const axisBaseLength = Math.max(modelSpanX, modelSpanDataY, modelSpanDataZ, 100) * 0.6;
 
-        if (!dataBounds) return;
-        const { minX, minY, minZ, maxX, maxY, maxZ } = dataBounds;
-        const modelSpanX = (maxX - minX + 1) * currentSpacingFactor;
-        const modelSpanDataY = (maxY - minY + 1) * currentSpacingFactor;
-        const modelSpanDataZ = (maxZ - minZ + 1) * currentSpacingFactor;
-        const axisBaseLength =
-          Math.max(modelSpanX, modelSpanDataY, modelSpanDataZ, 100) * 0.6;
+    // Visual X (Data X) - Red
+    // Visual Y (Data Z - Height) - Green
+    // Visual Z (Data Y - Depth) - Blue. Positive Visual Z is towards viewer.
+    const axesDefinitions = [
+        { name: 'X', className: 'axis-x-positive', color: 'red',
+          transform: `translateY(-1.5px)`,
+          labelTransform: `translateX(${axisBaseLength + 15}px) translateY(-8px)` },
+        { name: 'Z (Height)', className: 'axis-y-positive', color: 'green',
+          transform: `translateX(-1.5px) rotateZ(-90deg)`,
+          labelTransform: `translateY(-${axisBaseLength + 25}px) translateX(-30px)` },
+        // Blue line (Visual Z, Data Y) extends towards viewer (positive CSS Z)
+        { name: 'Y (Depth)', className: 'axis-z-positive', color: 'blue',
+          transform: `translateX(-1.5px) rotateY(-90deg)`,
+          // Label should be at the positive end of this visual Z axis
+          labelTransform: `translateZ(${axisBaseLength + 15}px) translateX(-30px) translateY(-8px)` }
+    ];
 
-        const axesDefinitions = [
-          {
-            name: "X",
-            className: "axis-x-positive",
-            color: "red",
-            transform: `translateY(-1.5px)`, // Line thickness offset
-            labelTransform: `translateX(${
-              axisBaseLength + 15
-            }px) translateY(-8px)`,
-          },
-          {
-            name: "Z (Height)",
-            className: "axis-y-positive",
-            color: "green",
-            transform: `translateX(-1.5px) rotateZ(-90deg)`,
-            labelTransform: `translateY(-${
-              axisBaseLength + 25
-            }px) translateX(-30px)`,
-          },
-          // Y (Depth) is Visual Z (Blue)
-          {
-            name: "Y (Depth)",
-            className: "axis-z-positive",
-            color: "blue",
-            transform: `translateX(-1.5px) rotateY(-90deg)`,
-            // Position label at the end of the blue line (Visual Z axis)
-            labelTransform: `translateZ(${
-              axisBaseLength + 15
-            }px) translateX(-30px) translateY(-8px)`,
-          },
-        ];
+    axesDefinitions.forEach(ax => {
+        const line = document.createElement('div');
+        line.classList.add('axis', ax.className);
+        line.style.width = `${axisBaseLength}px`;
+        line.style.transform = ax.transform;
+        axesContainer.appendChild(line);
 
-        axesDefinitions.forEach((ax) => {
-          const line = document.createElement("div");
-          line.classList.add("axis", ax.className);
-          line.style.width = `${axisBaseLength}px`;
-          line.style.transform = ax.transform;
-          axesContainer.appendChild(line);
+        const label = document.createElement('div');
+        label.classList.add('axis-label');
+        label.textContent = ax.name;
+        label.style.color = window.getComputedStyle(line).backgroundColor || ax.color;
+        label.style.transform = ax.labelTransform;
+        axesContainer.appendChild(label);
+    });
+}
 
-          const label = document.createElement("div");
-          label.classList.add("axis-label");
-          label.textContent = ax.name;
-          label.style.color =
-            window.getComputedStyle(line).backgroundColor || ax.color;
-          label.style.transform = ax.labelTransform;
-          axesContainer.appendChild(label);
-        });
-      }
 
-      function applySceneTransforms() {
-        // cameraRig positions the (0,0,0) of sceneElement.
-        // Since sceneElement's top/left are 50%/50%, its (0,0,0) point IS NOT at cameraRig's (0,0,0)
-        // UNLESS sceneElement itself has a transform: translate(-50%, -50%) to counteract its top/left.
-        // But with transform-origin: 0 0 0, this might be fine if cameraRig's translate focuses
-        // on bringing the desired world point (model center) to the viewport center.
+function applySceneTransforms() { /* ... unchanged ... */
+    cameraRig.style.transform = `translateX(${cameraTranslateX}px) translateY(${cameraTranslateY}px) translateZ(${cameraTranslateZ}px)`;
+    sceneElement.style.transform = `rotateX(${rotationX}deg) rotateY(${rotationY}deg)`;
+}
 
-        // Let's simplify: cameraRig's job is to position the *world origin* (which is where sceneElement is)
-        // such that the *model's center* (which is at sceneElement's 0,0,0) appears at the viewport center.
-        // Since sceneElement's 0,0,0 is already the model center, cameraRig should aim to
-        // bring *that specific point* to the center of the viewport.
-        // cameraTranslateX/Y = 0 should do this IF sceneElement is truly at cameraRig's (0,0,0)
-        // AND cameraRig is centered in sceneViewport.
+// --- Interaction Logic (unchanged) ---
+// ...
+let isDragging = false, currentAction = null, previousMouseX, previousMouseY, isSpacebarPressed = false;
+document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && !isSpacebarPressed) {
+        e.preventDefault(); isSpacebarPressed = true;
+        if (isDragging && currentAction === 'rotate') { currentAction = 'pan'; sceneViewport.style.cursor = 'move'; }
+        else if (!isDragging) { sceneViewport.style.cursor = 'move'; }
+    }
+});
+document.addEventListener('keyup', (e) => {
+    if (e.code === 'Space') {
+        e.preventDefault(); isSpacebarPressed = false;
+        if (isDragging && currentAction === 'pan') { currentAction = 'rotate'; sceneViewport.style.cursor = 'grabbing'; }
+        else if (!isDragging) { sceneViewport.style.cursor = 'grab'; }
+    }
+});
+sceneViewport.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return; isDragging = true;
+    previousMouseX = e.clientX; previousMouseY = e.clientY;
+    currentAction = isSpacebarPressed ? 'pan' : 'rotate';
+    sceneViewport.style.cursor = currentAction === 'pan' ? 'move' : 'grabbing';
+});
+document.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    const deltaX = e.clientX - previousMouseX, deltaY = e.clientY - previousMouseY;
+    if (currentAction === 'rotate') {
+        rotationY += deltaX * 0.5; rotationX -= deltaY * 0.5;
+        rotationX = Math.max(-90, Math.min(90, rotationX));
+    } else if (currentAction === 'pan') {
+        const panSensitivity = 1.0;
+        cameraTranslateX += deltaX * panSensitivity;
+        cameraTranslateY += deltaY * panSensitivity;
+    }
+    applySceneTransforms();
+    previousMouseX = e.clientX; previousMouseY = e.clientY;
+});
+document.addEventListener('mouseup', (e) => {
+    if (e.button !== 0) return;
+    if (isDragging) { isDragging = false; sceneViewport.style.cursor = isSpacebarPressed ? 'move' : 'grab'; }
+});
+sceneViewport.addEventListener('wheel', (e) => {
+    e.preventDefault(); const zoomIntensity = 0.5;
+    const scrollAmount = e.deltaY > 0 ? -100 : 100;
+    cameraTranslateZ += scrollAmount * zoomIntensity;
+    applySceneTransforms();
+});
 
-        // The current cameraRig transform translates THE CAMERA.
-        // So a cameraTranslateX of 0 means camera is aligned with viewport's X center.
-        // A cameraTranslateY of 0 means camera is aligned with viewport's Y center.
-        // This should correctly center the sceneElement's (0,0,0) if sceneElement is placed
-        // at cameraRig's (0,0,0) without additional offsets.
-        // The `top: 50%; left: 50%;` on #scene is the potential issue if not counter-translated.
-        // Let's remove top:50%; left:50% from #scene and see.
+// --- Controls (unchanged) ---
+// ...
+blockSizeSlider.addEventListener('input', (e) => {
+    currentBlockSize = parseInt(e.target.value);
+    blockSizeValueDisplay.textContent = `${currentBlockSize}px`;
+    updateAllBlockTransformsAndAxes();
+});
+spacingSlider.addEventListener('input', (e) => {
+    currentSpacingFactor = parseInt(e.target.value);
+    spacingValueDisplay.textContent = currentSpacingFactor;
+    updateAllBlockTransformsAndAxes();
+});
+resetButton.addEventListener('click', () => {
+    rotationX = INITIAL_ROTATION_X; rotationY = INITIAL_ROTATION_Y;
+    cameraTranslateX = INITIAL_CAMERA_X; cameraTranslateY = INITIAL_CAMERA_Y;
+    cameraTranslateZ = calculateOptimalZoomZ();
+    applySceneTransforms();
+    createOrUpdateAxes();
+});
 
-        cameraRig.style.transform = `translateX(${cameraTranslateX}px) translateY(${cameraTranslateY}px) translateZ(${cameraTranslateZ}px)`;
-        sceneElement.style.transform = `rotateX(${rotationX}deg) rotateY(${rotationY}deg)`;
-      }
+// --- Initialization ---
+blocksData = parseData(dataString);
+createBlocks(blocksData); // This now also adds event listeners for tooltip
+createOrUpdateAxes();
+cameraTranslateZ = calculateOptimalZoomZ();
+applySceneTransforms();
 
-      // --- Interaction Logic (unchanged) ---
-      // ...
-      let isDragging = false,
-        currentAction = null,
-        previousMouseX,
-        previousMouseY,
-        isSpacebarPressed = false;
-      document.addEventListener("keydown", (e) => {
-        if (e.code === "Space" && !isSpacebarPressed) {
-          e.preventDefault();
-          isSpacebarPressed = true;
-          if (isDragging && currentAction === "rotate") {
-            currentAction = "pan";
-            sceneViewport.style.cursor = "move";
-          } else if (!isDragging) {
-            sceneViewport.style.cursor = "move";
-          }
-        }
-      });
-      document.addEventListener("keyup", (e) => {
-        if (e.code === "Space") {
-          e.preventDefault();
-          isSpacebarPressed = false;
-          if (isDragging && currentAction === "pan") {
-            currentAction = "rotate";
-            sceneViewport.style.cursor = "grabbing";
-          } else if (!isDragging) {
-            sceneViewport.style.cursor = "grab";
-          }
-        }
-      });
-      sceneViewport.addEventListener("mousedown", (e) => {
-        if (e.button !== 0) return;
-        isDragging = true;
-        previousMouseX = e.clientX;
-        previousMouseY = e.clientY;
-        currentAction = isSpacebarPressed ? "pan" : "rotate";
-        sceneViewport.style.cursor =
-          currentAction === "pan" ? "move" : "grabbing";
-      });
-      document.addEventListener("mousemove", (e) => {
-        if (!isDragging) return;
-        const deltaX = e.clientX - previousMouseX,
-          deltaY = e.clientY - previousMouseY;
-        if (currentAction === "rotate") {
-          rotationY += deltaX * 0.5;
-          rotationX -= deltaY * 0.5;
-          rotationX = Math.max(-90, Math.min(90, rotationX));
-        } else if (currentAction === "pan") {
-          const panSensitivity = 1.0;
-          cameraTranslateX += deltaX * panSensitivity;
-          cameraTranslateY += deltaY * panSensitivity;
-        }
-        applySceneTransforms();
-        previousMouseX = e.clientX;
-        previousMouseY = e.clientY;
-      });
-      document.addEventListener("mouseup", (e) => {
-        if (e.button !== 0) return;
-        if (isDragging) {
-          isDragging = false;
-          sceneViewport.style.cursor = isSpacebarPressed ? "move" : "grab";
-        }
-      });
-      sceneViewport.addEventListener("wheel", (e) => {
-        e.preventDefault();
-        const zoomIntensity = 0.5;
-        const scrollAmount = e.deltaY > 0 ? -100 : 100;
-        cameraTranslateZ += scrollAmount * zoomIntensity;
-        applySceneTransforms();
-      });
+// Remove originMarker if no longer needed for debugging
+const originMarker = sceneElement.querySelector('#originMarker');
+if (originMarker) {
+    originMarker.remove(); // Clean up if it exists from previous runs
+}
+// To add it again for debugging:
+/*
+const debugMarker = document.createElement('div');
+debugMarker.id = 'originMarker'; // Give it an ID for potential removal
+debugMarker.style.width = '10px';
+debugMarker.style.height = '10px';
+debugMarker.style.background = 'magenta';
+debugMarker.style.position = 'absolute';
+debugMarker.style.transform = 'translate3d(-5px, -5px, -5px)';
+sceneElement.appendChild(debugMarker);
+*/
 
-      // --- Controls (unchanged) ---
-      // ...
-      blockSizeSlider.addEventListener("input", (e) => {
-        currentBlockSize = parseInt(e.target.value);
-        blockSizeValueDisplay.textContent = `${currentBlockSize}px`;
-        updateAllBlockTransformsAndAxes();
-      });
-      spacingSlider.addEventListener("input", (e) => {
-        currentSpacingFactor = parseInt(e.target.value);
-        spacingValueDisplay.textContent = currentSpacingFactor;
-        updateAllBlockTransformsAndAxes();
-      });
-      resetButton.addEventListener("click", () => {
-        rotationX = INITIAL_ROTATION_X;
-        rotationY = INITIAL_ROTATION_Y;
-        cameraTranslateX = INITIAL_CAMERA_X;
-        cameraTranslateY = INITIAL_CAMERA_Y;
-        cameraTranslateZ = calculateOptimalZoomZ();
-        applySceneTransforms();
-        createOrUpdateAxes();
-      });
-
-      // --- Initialization ---
-      blocksData = parseData(dataString);
-      createBlocks(blocksData);
-      createOrUpdateAxes();
-      cameraTranslateZ = calculateOptimalZoomZ();
-      applySceneTransforms();
-
-      // Keep originMarker
-      const originMarker = document.createElement("div");
-      originMarker.style.width = "10px";
-      originMarker.style.height = "10px";
-      originMarker.style.background = "magenta";
-      originMarker.style.position = "absolute";
-      originMarker.style.transform = "translate3d(-5px, -5px, -5px)";
-      sceneElement.appendChild(originMarker);
-    </script>
-  </body>
+</script>
+</body>
 </html>
